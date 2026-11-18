@@ -1,0 +1,70 @@
+
+name: 01 - Java Build and Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and Test Java Application
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Step 1: Download source code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Verify project structure
+      - name: Verify Project Structure
+        run: |
+          echo "Checking Maven project structure..."
+
+          test -f pom.xml || exit 1
+          test -f src/main/java/com/example/App.java || exit 1
+          test -f src/test/java/com/example/AppTest.java || exit 1
+
+          test -d src/main/java || exit 1
+          test -d src/test/java || exit 1
+
+          echo "Project structure verified successfully!"
+
+      # Step 3: Install Java 17
+      - name: Set Up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # Step 4: Compile Java application
+      - name: Compile Application
+        run: mvn clean compile
+
+      # Step 5: Execute unit tests
+      - name: Run Unit Tests
+        run: mvn test
+
+      # Step 6: Generate JAR package
+      - name: Package Application
+        run: mvn package
+
+      # Step 7: Upload JAR artifact
+      - name: Upload JAR Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-app-jar
+          path: target/*.jar
+          if-no-files-found: error
+          retention-days: 7
