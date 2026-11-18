@@ -1,0 +1,70 @@
+
+name: 03 - Docker Build and Push
+
+on:
+  workflow_run:
+    workflows:
+      - "02 - SonarQube Code Quality Analysis"
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build-push:
+    name: Build and Push Docker Image
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+
+    runs-on: [self-hosted, linux, x64]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set Up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Build Java Application
+        run: mvn -B clean package
+
+      - name: Login to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DOCKERHUB_TOKEN" | docker login \
+            --username "$DOCKERHUB_USERNAME" \
+            --password-stdin
+
+      - name: Build Docker Image
+        env:
+          IMAGE_NAME: bharathraj007/java-cicd-project
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          docker build \
+            -t "$IMAGE_NAME:latest" \
+            -t "$IMAGE_NAME:$IMAGE_TAG" .
+
+      - name: Push Docker Image
+        env:
+          IMAGE_NAME: bharathraj007/java-cicd-project
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          docker push "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:$IMAGE_TAG"
+
+      - name: Logout from Docker Hub
+        if: always()
+        run: docker logout
